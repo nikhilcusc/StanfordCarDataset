@@ -1,0 +1,7 @@
+.\venv
+.\__pycache__
+.\archive
+.\outputs\*
+archive
+archive.zip
+*.pyc
