@@ -19,25 +19,37 @@ Key steps in `infer.ipynb`:
 2. Read the Stanford Cars class metadata from `archive/cars_meta.mat`.
 3. Preprocess a test image with resize, center crop, tensor conversion, and normalization.
 4. Run inference to get the predicted class and confidence.
-5. Compute and plot both vanilla saliency and integrated gradients maps.
+5. Compute and plot vanilla saliency, integrated gradients, and LIME maps.
 
 ## Example Results
 
-The figures below are saved in the `figures/` folder and summarize the explanation outputs for the same sample car image.
+The figures below are saved in the `figures/` folder and show two different car examples for each explanation method.
 
 ### Integrated Gradients
 
-![Integrated Gradients](figures/IG.png)
+| Car 1 | Car 2 |
+| --- | --- |
+| ![Integrated Gradients 1](figures/IG.png) | ![Integrated Gradients 2](figures/IG_2.png) |
 
 ### Vanilla Saliency
 
-![Vanilla Saliency](figures/vanilla.png)
+| Car 1 | Car 2 |
+| --- | --- |
+| ![Vanilla Saliency 1](figures/vanilla.png) | ![Vanilla Saliency 2](figures/vanilla_2.png) |
+
+### LIME
+
+| Car 1 | Car 2 |
+| --- | --- |
+| ![LIME 1](figures/LIME.png) | ![LIME 2](figures/LIME_2.png) |
 
 ### Discussion
 
-Both methods highlight the vehicle rather than the blank background, which is a good sign that the model is using image content instead of spurious context. The integrated gradients map is a little more structured and tends to concentrate on the car body, roofline, and wheel regions, while the vanilla saliency map is noisier and more diffuse.
+Across both cars, all three methods mostly focus on the vehicle instead of the background, which suggests the model is learning from the car itself rather than the scene. Integrated gradients gives the most continuous attribution and usually traces the body, windows, and wheel areas more cleanly than the others.
 
-That difference is expected: vanilla gradients can be sensitive to local pixel-level changes, so they often look speckled. Integrated gradients usually produce a smoother attribution map because they accumulate gradients along a path from a baseline to the input. In this example, integrated gradients gives the clearer explanation of why the model is leaning toward the predicted class.
+Vanilla saliency is noticeably noisier and more pixel-level, so it is useful as a quick signal but less stable as an explanation. LIME produces larger, block-like regions and is easier to read at a glance, but the superpixel boundaries can make it feel more coarse than gradient-based methods. In these examples, LIME still captures the rough object outline and confirms that the model is relying on the car region, while integrated gradients provides the clearest fine-grained explanation.
+
+The main takeaway is that the methods are consistent at a high level but differ in granularity: vanilla saliency is the noisiest, integrated gradients is the smoothest, and LIME is the most segmented.
 
 ## Quick Start
 

@@ -1,6 +1,10 @@
 import torch   
 import matplotlib.pyplot as plt
 from PIL import Image
+import numpy as np
+import shap
+from lime import lime_image
+from skimage.segmentation import slic
 
 
 # Vanilla Saliency logic
@@ -105,3 +109,189 @@ def plot_saliency(display_img, saliency, cmap="hot", title="Saliency Map"):
     fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04)
     plt.tight_layout()
     plt.show()
+
+
+def _forward_logits(model, x):
+    """
+    Handles models that return logits directly or tuples/lists.
+    """
+    out = model(x)
+    if isinstance(out, (tuple, list)):
+        out = out[0]
+    return out
+
+
+def _to_pil(img):
+    """
+    Convert numpy / PIL / tensor-like image to PIL RGB.
+    """
+    if isinstance(img, Image.Image):
+        return img.convert("RGB")
+    if isinstance(img, np.ndarray):
+        if img.dtype != np.uint8:
+            arr = np.clip(img, 0, 255).astype(np.uint8)
+        else:
+            arr = img
+        return Image.fromarray(arr).convert("RGB")
+    raise TypeError(f"Unsupported image type: {type(img)}")
+
+
+def _predict_proba_from_images(images, model, transform, device):
+    """
+    LIME classifier_fn: takes a list/array of images and returns class probabilities.
+    """
+    model.eval()
+    tensors = []
+
+    for img in images:
+        pil_img = _to_pil(img)
+        tensors.append(transform(pil_img))
+
+    batch = torch.stack(tensors).to(device)
+
+    with torch.no_grad():
+        logits = _forward_logits(model, batch)
+        probs = torch.softmax(logits, dim=1)
+
+    return probs.detach().cpu().numpy()
+
+
+def _normalize_heatmap(arr):
+    arr = arr.astype(np.float32)
+    arr = np.abs(arr)
+    mn, mx = arr.min(), arr.max()
+    return (arr - mn) / (mx - mn + 1e-8)
+
+
+def compute_lime_saliency(
+    image_path,
+    model,
+    transform,
+    device,
+    num_samples=1000,
+    num_features=10,
+    top_labels=1,
+    n_segments=100,
+    compactness=10,
+    sigma=1,
+):
+    """
+    Returns:
+        display_img: image for plotting
+        heatmap: normalized HxW LIME explanation
+        top_idx: predicted class index
+    """
+    orig_img, display_img = open_image_for_display(image_path)
+    model.eval()
+
+    # Predict top class
+    input_tensor = transform(orig_img).unsqueeze(0).to(device)
+    with torch.no_grad():
+        logits = _forward_logits(model, input_tensor)
+        top_idx = logits.argmax(dim=1).item()
+
+    explainer = lime_image.LimeImageExplainer()
+
+    def classifier_fn(images):
+        return _predict_proba_from_images(images, model, transform, device)
+
+    image_np = np.array(display_img.convert("RGB") if isinstance(display_img, Image.Image) else display_img)
+
+    explanation = explainer.explain_instance(
+        image_np,
+        classifier_fn,
+        top_labels=top_labels,
+        hide_color=0,
+        num_samples=num_samples,
+        segmentation_fn=lambda x: slic(
+            x,
+            n_segments=n_segments,
+            compactness=compactness,
+            sigma=sigma,
+            start_label=0,
+        ),
+    )
+
+    segments = explanation.segments
+    local_exp = dict(explanation.local_exp.get(top_idx, []))
+
+    heatmap = np.zeros(segments.shape, dtype=np.float32)
+    for seg_id, weight in local_exp.items():
+        heatmap[segments == seg_id] = weight
+
+    heatmap = _normalize_heatmap(heatmap)
+    return display_img, heatmap, top_idx
+
+
+def compute_shap_saliency(
+    image_path,
+    model,
+    transform,
+    device,
+    background_paths=None,
+    background_images=None,
+    background_size=8,
+    nsamples=50,
+):
+    """
+    Returns:
+        display_img: image for plotting
+        heatmap: normalized HxW SHAP explanation
+        top_idx: predicted class index
+
+    Notes:
+    - SHAP works best with a small representative background set.
+    - If no background is provided, this falls back to zeros.
+    """
+    orig_img, display_img = open_image_for_display(image_path)
+    model.eval()
+
+    input_tensor = transform(orig_img).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        logits = _forward_logits(model, input_tensor)
+        top_idx = logits.argmax(dim=1).item()
+
+    # Build background batch
+    bg_tensors = []
+
+    if background_images is not None:
+        for img in background_images[:background_size]:
+            bg_tensors.append(transform(_to_pil(img)))
+    elif background_paths is not None:
+        for p in background_paths[:background_size]:
+            bg_orig, _ = open_image_for_display(p)
+            bg_tensors.append(transform(bg_orig))
+    else:
+        # Simple fallback; better to provide a small background set if possible.
+        bg_tensors = [torch.zeros_like(input_tensor.squeeze(0)) for _ in range(background_size)]
+
+    background = torch.stack(bg_tensors).to(device)
+
+    explainer = shap.GradientExplainer(model, background)
+
+    shap_values = explainer.shap_values(input_tensor, nsamples=nsamples)
+
+    # Handle common return formats
+    if isinstance(shap_values, list):
+        sv = shap_values[top_idx]
+        # expected shape: (1, C, H, W)
+        if isinstance(sv, np.ndarray):
+            sv = sv[0]
+    else:
+        sv = shap_values
+        # possible shapes: (1, C, H, W) or (1, num_classes, C, H, W)
+        sv = np.array(sv)
+        if sv.ndim == 5:
+            sv = sv[0, top_idx]
+        elif sv.ndim == 4:
+            sv = sv[0]
+
+    # Collapse channels to 2D heatmap
+    if isinstance(sv, torch.Tensor):
+        sv = sv.detach().cpu().numpy()
+
+    heatmap = np.max(np.abs(sv), axis=0)
+    heatmap = _normalize_heatmap(heatmap)
+
+    return display_img, heatmap, top_idx
