@@ -1,6 +1,6 @@
 # Stanford Cars Classification
 
-This repository contains a PyTorch workflow for training and evaluating a ResNet50 model on the Stanford Cars dataset. It includes notebook-based exploration, training code, dataset annotations, and saved model weights for inference.
+This repository contains a PyTorch workflow for training and evaluating a ResNet50 model on the Stanford Cars dataset ([GitHub - jhpohovey/StanfordCars-Dataset](https://github.com/jhpohovey/StanfordCars-Dataset)). It includes notebook-based data exploration, training code, and saved model weights for inference.
 
 ## What's Inside
 
@@ -21,9 +21,29 @@ Key steps in `infer.ipynb`:
 4. Run inference to get the predicted class and confidence.
 5. Compute and plot vanilla saliency, integrated gradients, and LIME maps.
 
-## Example Results
+## Results
 
-The figures below are saved in the `figures/` folder and show two different car examples for each explanation method.
+The figures below are saved in the `figures/` folder and show two different cars for each explanation method.
+
+### Vanilla Saliency
+
+They measure how much a small change in each pixel would change the model’s output. The result is a saliency map showing pixel‑level importance.
+
+| Car 1 | Car 2 |
+| --- | --- |
+| ![Vanilla Saliency 1](figures/vanilla.png) | ![Vanilla Saliency 2](figures/vanilla_2.png) |
+
+Limitations:
+1. Noisy and Hard to Interpret - Raw gradients often produce high‑frequency, noisy maps that don’t align with human‑interpretable features. This makes explanations visually unstable and difficult to trust.
+1. Sensitive to Model Saturation - If the model is in a saturated region (e.g., ReLU outputs zero), gradients can vanish. This leads to misleading saliency maps that suggest nothing is important. - to fix use Integrated gradients!
+1. Not Robust to Small Perturbations - Tiny changes in the input can drastically change the gradient map, showing that vanilla gradients lack stability.
+1. Highlighting Edges Instead of Semantics - Gradients often emphasize edges or texture rather than the meaningful object parts the model actually uses.
+1. Poor Localization - The method struggles to clearly identify which regions of the image drive the prediction, especially in complex scenes.
+
+How to fix:
+Vanilla Gradients - raw sensitivity map; simple but noisy
+Use Guided Backpropagation - filters gradients to highlight edges; prettier but less faithful
+Use SmoothGrad - averages gradients over noisy inputs; reduces noise and improves clarity
 
 ### Integrated Gradients
 
@@ -31,17 +51,25 @@ The figures below are saved in the `figures/` folder and show two different car 
 | --- | --- |
 | ![Integrated Gradients 1](figures/IG.png) | ![Integrated Gradients 2](figures/IG_2.png) |
 
-### Vanilla Saliency
-
-| Car 1 | Car 2 |
-| --- | --- |
-| ![Vanilla Saliency 1](figures/vanilla.png) | ![Vanilla Saliency 2](figures/vanilla_2.png) |
-
 ### LIME
+
+LIME explains a single prediction of a black‑box model by:
+
+1. Creating perturbed versions of the input image
+1. Getting the model’s predictions for each perturbed sample
+1. Weighting these samples based on how similar they are to the original
+1. Fitting a simple, interpretable surrogate model (usually linear)
+1. Using that surrogate to identify which parts of the image influenced the prediction
 
 | Car 1 | Car 2 |
 | --- | --- |
 | ![LIME 1](figures/LIME.png) | ![LIME 2](figures/LIME_2.png) |
+
+Limitations:
+1. Hyperparameter sensitivity - Small changes (e.g., number of superpixels) can produce inconsistent explanations.
+1. Out-of-distribution perturbations - Masking superpixels creates unrealistic images, causing the model to behave unpredictably.
+1. Local linearity assumption - Vision models are highly nonlinear; a linear surrogate may poorly approximate local behavior.
+1. Instability - Re-running LIME can yield different explanations due to randomness in segmentation and sampling.
 
 ### Discussion
 
