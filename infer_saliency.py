@@ -172,6 +172,38 @@ def save_saliency_figure(display_img, saliency_map, output_path: Path, title: st
     plt.close(fig)
 
 
+def infer_saliency(image, saliency_method: str):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    meta_file = DEFAULT_META_FILE
+    checkpoint_path = DEFAULT_CHECKPOINT
+
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    if not meta_file.is_file():
+        raise FileNotFoundError(f"Metadata file not found: {meta_file}")
+
+    class_df = load_class_metadata(meta_file)
+    model = build_resnet50(num_classes=len(class_df))
+    model = load_model_weights(model, checkpoint_path, device)
+    transform = get_preprocess_transform()
+
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
+    if not isinstance(image, Image.Image):
+        raise TypeError(f"Unsupported image type: {type(image)}")
+
+    temp_path = BASE_DIR / "outputs" / "saliency" / "_gradio_input.png"
+    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    image.convert("RGB").save(temp_path)
+
+    display_img, predicted_idx, confidence = predict_image(temp_path, model, transform, device)
+    saliency_display_img, saliency_map, _ = compute_saliency_map(temp_path, saliency_method, model, transform, device)
+
+    class_name = class_df.iloc[predicted_idx]["class_name"]
+    return saliency_map, class_name, confidence
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Stanford Cars inference with a saliency explanation.")
     parser.add_argument("image_path", type=Path, help="Path to the input image")

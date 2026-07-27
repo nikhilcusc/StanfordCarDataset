@@ -1,4 +1,5 @@
 .\venv
+.\cars_env_v
 .\__pycache__
 .\archive
 .\outputs\*
