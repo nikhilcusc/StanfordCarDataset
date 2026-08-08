@@ -168,7 +168,7 @@ def compute_lime_saliency(
     model,
     transform,
     device,
-    num_samples=1000,
+    num_samples=100,
     num_features=10,
     top_labels=1,
     n_segments=100,
