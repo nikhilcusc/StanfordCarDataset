@@ -3,6 +3,7 @@
 .\__pycache__
 .\archive
 .\outputs\*
+.\outputs\saliency
 archive
 archive.zip
 *.pyc
