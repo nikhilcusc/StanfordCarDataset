@@ -15,7 +15,7 @@
 - [ ] Verify the selected model works with the same preprocessing pipeline.
 
 ## Saliency Methods
-- [ ] Add more saliency methods beyond the current set.
+- [x] Add more saliency methods beyond the current set.
 - [ ] Standardize outputs so each method can be displayed consistently.
 - [ ] Confirm each method can run on the same input image.
 

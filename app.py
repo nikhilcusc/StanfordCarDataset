@@ -63,7 +63,14 @@ def main():
             with gr.Column():
                 image_input = gr.Image(label="Upload Image", type="pil")
                 saliency_method = gr.Dropdown(
-                    choices=["vanilla", "integrated_gradients", "lime", "shap"],
+                    choices=[
+                        "vanilla",
+                        "integrated_gradients",
+                        "lime",
+                        "shap",
+                        "guided_backprop",
+                        "gradcam",
+                    ],
                     value="vanilla",
                     label="Saliency Method"
                 )

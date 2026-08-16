@@ -1,4 +1,5 @@
-import torch   
+import torch
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
@@ -24,6 +25,134 @@ def compute_saliency(image_path, model, transform, device):
     saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min() + 1e-8)
     return display_img, saliency, top_idx
 
+# todo add  gradcam logic
+def compute_gradcam(image_path, model, target_layer, transform, device):
+    """
+    Computes Grad-CAM for a given target layer.
+    
+    Args:
+        target_layer: The specific layer to target (e.g., model.layer4[-1] for ResNet)
+    Returns:
+        display_img: image for visualization
+        cam: normalized (H, W) Grad-CAM heatmap
+        top_idx: predicted class index
+    """
+    orig_img, display_img = open_image_for_display(image_path)
+    input_tensor = transform(orig_img).unsqueeze(0).to(device)
+
+    activations = None
+    gradients = None
+
+    # Hooks to extract forward activations and backward gradients
+    def forward_hook(module, input, output):
+        nonlocal activations
+        activations = output
+
+    def backward_hook(module, grad_input, grad_output):
+        nonlocal gradients
+        gradients = grad_output[0]
+
+    # Register hooks
+    fw_hook = target_layer.register_forward_hook(forward_hook)
+    bw_hook = target_layer.register_full_backward_hook(backward_hook)
+
+    model.eval()
+    model.zero_grad()
+
+    # Forward pass
+    outputs = model(input_tensor)
+    top_idx = outputs.argmax(dim=1).item()
+    score = outputs[0, top_idx]
+
+    # Backward pass
+    score.backward()
+
+    # Remove hooks to prevent side effects later
+    fw_hook.remove()
+    bw_hook.remove()
+
+    # Global average pooling of gradients
+    weights = torch.mean(gradients, dim=(2, 3), keepdim=True)
+    
+    # Weighted combination of forward activations
+    cam = torch.sum(weights * activations, dim=1, keepdim=True)
+    
+    # Apply ReLU
+    cam = F.relu(cam)
+    
+    # Interpolate to input tensor size (H, W)
+    cam = F.interpolate(cam, size=input_tensor.shape[2:], mode='bilinear', align_corners=False)
+    cam = cam.squeeze().detach().cpu().numpy()
+
+    # Normalize to [0,1]
+    cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
+
+    return display_img, cam, top_idx
+
+# todo add guided backprop logic
+def compute_guided_backprop(image_path, model, transform, device):
+    orig_img, display_img = open_image_for_display(image_path)
+    input_tensor = transform(orig_img).unsqueeze(0).to(device)
+    input_tensor.requires_grad_()
+
+    hooks = []
+    original_inplace_states = {}
+
+    def forward_hook(module, input, output):
+        # Use a list to stack outputs for layers used multiple times
+        if not hasattr(module, 'saved_outputs'):
+            module.saved_outputs = []
+        module.saved_outputs.append(output.clone())
+
+    def backward_hook(module, grad_in, grad_out):
+        grad = grad_out[0]
+        if grad is not None and hasattr(module, 'saved_outputs') and len(module.saved_outputs) > 0:
+            # Pop the most recent forward output (matches reverse order of backward pass)
+            saved_output = module.saved_outputs.pop()
+            
+            pos_grad = torch.clamp(grad.clone(), min=0.0)
+            pos_act = (saved_output > 0).float()
+            return (pos_grad * pos_act,)
+
+    # Iterate through all modules, disable inplace, and register hooks
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.ReLU):
+            original_inplace_states[name] = module.inplace
+            module.inplace = False
+            
+            hooks.append(module.register_forward_hook(forward_hook))
+            hooks.append(module.register_full_backward_hook(backward_hook))
+
+    model.eval()
+    model.zero_grad()
+
+    outputs = model(input_tensor)
+    top_idx = outputs.argmax(dim=1).item()
+    score = outputs[0, top_idx]
+
+    score.backward()
+
+    # Cleanup hooks
+    for hook in hooks:
+        hook.remove()
+        
+    # Cleanup saved outputs and restore the original inplace settings
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.ReLU):
+            if hasattr(module, 'saved_outputs'):
+                del module.saved_outputs
+            if name in original_inplace_states:
+                module.inplace = original_inplace_states[name]
+
+    saliency = input_tensor.grad.data.abs().squeeze(0)  # (C, H, W)
+    saliency, _ = torch.max(saliency, dim=0)            # (H, W)
+    saliency = saliency.cpu().numpy()
+
+    saliency = (saliency - saliency.min()) / (saliency.max() - saliency.min() + 1e-8)
+
+    return display_img, saliency, top_idx
+
+# integrated gradients logic
 def compute_integrated_gradients(
     image_path,
     model,

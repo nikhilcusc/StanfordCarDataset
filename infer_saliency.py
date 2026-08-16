@@ -17,6 +17,8 @@ from torchvision import transforms
 from torchvision.models import ResNet50_Weights, resnet50
 
 from saliencyDefs import (
+    compute_gradcam,
+    compute_guided_backprop,
     compute_integrated_gradients,
     compute_lime_saliency,
     compute_saliency,
@@ -130,6 +132,12 @@ def resolve_method(method_name: str):
         "ig": "integrated_gradients",
         "lime": "lime",
         "shap": "shap",
+        "guided_backprop": "guided_backprop",
+        "guided_backpropagation": "guided_backprop",
+        "gbp": "guided_backprop",
+        "gradcam": "gradcam",
+        "grad_cam": "gradcam",
+        "grad-cam": "gradcam",
     }
 
     if normalized not in aliases:
@@ -150,6 +158,11 @@ def compute_saliency_map(image_path: Path, method_name: str, model: nn.Module, t
         return compute_lime_saliency(image_path, model, transform, device)
     if method == "shap":
         return compute_shap_saliency(image_path, model, transform, device)
+    if method == "guided_backprop":
+        return compute_guided_backprop(image_path, model, transform, device)
+    if method == "gradcam":
+        target_layer = model.layer4[-1]
+        return compute_gradcam(image_path, model, target_layer, transform, device)
 
     raise ValueError(f"Unsupported saliency method: {method_name}")
 
@@ -210,7 +223,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "method",
         type=str,
-        help="Saliency method: vanilla, integrated_gradients, lime, or shap",
+        help="Saliency method: vanilla, integrated_gradients, lime, shap, guided_backprop, or gradcam",
     )
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT, help="Model checkpoint path")
     parser.add_argument("--meta-file", type=Path, default=DEFAULT_META_FILE, help="Stanford Cars metadata file")
