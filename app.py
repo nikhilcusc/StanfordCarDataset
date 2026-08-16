@@ -74,6 +74,10 @@ def main():
                     value="vanilla",
                     label="Saliency Method"
                 )
+                ig_note = gr.Markdown(
+                    "**Note:** Running only 50 iterations for Integrated Gradients.",
+                    visible=False,
+                )
                 submit_button = gr.Button("Generate Saliency Map")
 
             with gr.Column():
@@ -94,6 +98,15 @@ def main():
             fn=process_image,
             label="Example Images",
             run_on_click=True,
+        )
+
+        def toggle_ig_note(method):
+            return gr.update(visible=(method == "integrated_gradients"))
+
+        saliency_method.change(
+            fn=toggle_ig_note,
+            inputs=saliency_method,
+            outputs=ig_note,
         )
 
         submit_button.click(

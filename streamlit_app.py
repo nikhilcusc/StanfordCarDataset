@@ -11,9 +11,11 @@ from infer_saliency import infer_saliency
 # --- Configuration & Styling ---
 st.set_page_config(
     page_title="Saliency Map Visualizer", 
-    page_icon="🧠", 
+    page_icon="'🚗'", 
     layout="wide"
 )
+
+
 
 EXAMPLES_DIR = Path(__file__).resolve().parent / "examples"
 
@@ -34,8 +36,20 @@ def load_image(image_file):
 
 
 def main():
-    st.title("Saliency Map Visualization")
-    st.markdown("Upload an image or choose an example to generate visual explanations for the model's predictions.")
+
+    # Hero header with gradient styling
+    st.markdown("""
+    <style>
+        .hero { text-align: center; padding: 2rem 0; }
+        .hero h1 { font-size: 3rem; background: linear-gradient(90deg, #E63946, #F4A261);
+                   -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p { font-size: 1.2rem; color: #888; }
+    </style>
+    <div class="hero">
+        <h1>Saliency Map Visualizer</h1>
+        <p>Explainable AI for Stanford Cars — see what the model sees</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # --- Sidebar for Inputs & Settings ---
     with st.sidebar:
@@ -51,10 +65,31 @@ def main():
             index=0
         )
 
-        if saliency_method == "integrated_gradients":
-            st.info("**Note:** Running only 50 iterations for Integrated Gradients.")
-
         st.markdown("---")
+        
+        with st.expander("ℹ️ How does this method work?"):
+            if saliency_method == "vanilla":
+                st.write(
+                    "**Vanilla Saliency (Gradients)** calculates how sensitive the model's prediction is to each individual pixel. "
+                    "It simply asks: *'If I change this pixel slightly, how much does the final prediction change?'* "
+                    "Pixels with the highest sensitivity are highlighted."
+                )
+            elif saliency_method == "integrated_gradients":
+                st.write(
+                    "**Integrated Gradients** solves a common problem where models become 'blind' to highly important features (gradient saturation). "
+                    "It does this by slowly fading your image in from a completely black baseline image, calculating and adding up the gradients at every step along the way."
+                )
+                
+            elif saliency_method == "gradcam":
+                st.write("**Grad-CAM** looks at the final convolutional layers of the neural network to see which areas activated the most for the predicted class.")
+            elif saliency_method == "guided_backprop":
+                st.write("**Guided Backpropagation** traces the prediction backwards through the network, highlighting the exact pixels that contributed most positively to the result.")
+
+
+        if saliency_method == "integrated_gradients":
+            st.info("**Note:** Integrated Gradients is running only 50 iterations right now. Usually, we run more iterations (e.g., 100-300) for better interpretability and smoother results.")
+
+            st.markdown("---")
 
         # Handle Example Images dynamically
         st.header("Examples")
@@ -74,7 +109,7 @@ def main():
 
     with col1:
         st.subheader("Input Image")
-        uploaded_file = st.file_uploader("Upload your own image...", type=["jpg", "jpeg", "png"])
+        uploaded_file = st.file_uploader("Upload your own image or select an example from the sidebar.", type=["jpg", "jpeg", "png"])
 
     image_to_process = None
 
@@ -129,7 +164,18 @@ def main():
                     else:
                         confidence_str = str(confidence)
                         
-                    metric_col2.metric(label="Confidence Score", value=confidence_str)
+                   
+
+                    # A little pop-up notification in the bottom right
+                    st.success(f"Successfully generated {saliency_method} map!", icon="✅")
+
+                    st.write(f"**Confidence Level:** {confidence_str}")
+                    #st.write("Confidence Level:")
+                    #metric_col2.metric(label="Confidence Score", value=confidence_str)
+                    
+                    # Create a progress bar (requires a value between 0.0 and 1.0 or 0 to 100)
+                    progress_val = int(confidence * 100) if confidence <= 1.0 else int(confidence)
+                    st.progress(progress_val)
 
                 except Exception as exc:
                     st.error(f"An error occurred during inference: {exc}")

@@ -15,5 +15,6 @@ fastapi>=0.100.0
 pydantic==2.10.6
 gradio>=4.40.0
 gradio_client>=1.0.0
+streamlit
 uvicorn[standard]
 huggingface_hub>=1.0.0
