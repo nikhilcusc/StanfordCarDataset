@@ -1,9 +1,9 @@
 .\venv
 .\cars_env_v
 .\__pycache__
-.\archive
+archive/cars_test/
+archive/cars_train/
 outputs/
-archive
 archive.zip
 *.pyc
 
