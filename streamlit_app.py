@@ -117,12 +117,12 @@ def main():
     if uploaded_file is not None:
         image_to_process = load_image(uploaded_file)
         with col1:
-            st.image(image_to_process, use_column_width=True)
+            st.image(image_to_process, use_container_width=True)
     elif selected_example != "None":
         example_path = EXAMPLES_DIR / selected_example
         image_to_process = load_image(example_path)
         with col1:
-            st.image(image_to_process, caption=f"Example: {selected_example}", use_column_width=True)
+            st.image(image_to_process, caption=f"Example: {selected_example}", use_container_width=True)
     else:
         with col1:
             st.info("Please upload an image or select an example from the sidebar.")
@@ -149,7 +149,7 @@ def main():
                     with col2:
                         st.subheader("Saliency Map")
                         # clamp=True ensures float arrays (0.0 to 1.0) render correctly 
-                        st.image(saliency_map, use_column_width=True, clamp=True)
+                        st.image(saliency_map, use_container_width=True, clamp=True)
 
                     st.markdown("---")
                     
@@ -163,8 +163,6 @@ def main():
                         confidence_str = f"{confidence * 100:.2f}%" if confidence <= 1.0 else f"{confidence:.2f}"
                     else:
                         confidence_str = str(confidence)
-                        
-                   
 
                     # A little pop-up notification in the bottom right
                     st.success(f"Successfully generated {saliency_method} map!", icon="✅")
@@ -182,7 +180,6 @@ def main():
                 finally:
                     # Clean up memory
                     release_memory()
-
 
 if __name__ == "__main__":
     main()
