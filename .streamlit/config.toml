@@ -1,0 +1,11 @@
+[theme]
+
+backgroundColor = "#120d1e"          # Very dark purple/black
+secondaryBackgroundColor = "#1f1433" # Rich plum sidebar
+primaryColor = "#ff2a6d"             # Neon pink/magenta accent
+textColor = "#ffffff"                # Pure white text
+
+#backgroundColor = "#f9fbf9"          # Very pale mint/white
+#secondaryBackgroundColor = "#eef4ef" # Soft sage green sidebar
+#primaryColor = "#2b7a4b"             # Deep forest green accent
+#textColor = "#1c241f"                # Dark gray/green text for readability

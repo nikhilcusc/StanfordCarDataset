@@ -5,9 +5,9 @@
 - [ ] Add a short overview of the Explainability Explorer workflow and what users can do with it.
 
 ## App
-- [ ] Build the Explainability Explorer in Gradio.
+- [x] Build the Explainability Explorer in Gradio.
 - [ ] Design a clean flow for loading an image, running inference, and displaying explanations.
-- [ ] Make the interface usable for quick experimentation and comparison.
+- [x] Make the interface usable for quick experimentation and comparison.
 
 ## Models
 - [ ] Include different models for inference and comparison.
@@ -15,7 +15,7 @@
 - [ ] Verify the selected model works with the same preprocessing pipeline.
 
 ## Saliency Methods
-- [ ] Add more saliency methods beyond the current set.
+- [x] Add more saliency methods beyond the current set.
 - [ ] Standardize outputs so each method can be displayed consistently.
 - [ ] Confirm each method can run on the same input image.
 
