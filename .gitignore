@@ -2,8 +2,8 @@
 .\cars_env_v
 .\__pycache__
 .\archive
-.\outputs\*
-.\outputs\saliency
+outputs/
 archive
 archive.zip
 *.pyc
+
